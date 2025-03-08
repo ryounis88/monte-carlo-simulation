@@ -1,12 +1,11 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
 
 # Streamlit App Title
-st.title("Project Delivery Method Selection")
-st.write("This app helps in selecting the best project delivery method by simulating different scenarios based on user-defined input values.")
+st.title("Monte Carlo Simulation for Project Delivery Method Selection")
 
 # Sidebar for User Inputs
 st.sidebar.header("Simulation Parameters")
@@ -65,6 +64,7 @@ methods = {
 # Monte Carlo Simulation
 st.header("Running Monte Carlo Simulation...")
 results = []
+scores_dict = {}
 
 for method, params in methods.items():
     scores = []
@@ -87,6 +87,7 @@ for method, params in methods.items():
         scores.append(score)
 
     results.append({"method": method, "scores": scores, "mean_score": np.mean(scores), "std_dev": np.std(scores)})
+    scores_dict[method] = scores
 
 # Convert results into a DataFrame
 df_results = pd.DataFrame({
@@ -99,27 +100,34 @@ df_results = pd.DataFrame({
 st.subheader("Simulation Results")
 st.write(df_results)
 
-# Plot PDFs
-st.subheader("Probability Density Functions (PDFs)")
-plt.figure(figsize=(10, 6))
-for r in results:
-    sns.kdeplot(r["scores"], label=f"{r['method']} (Mean: {r['mean_score']:.3f})", shade=True)
-plt.title("Probability Density Function (PDF) of Scores")
-plt.xlabel("Score")
-plt.ylabel("Density")
-plt.legend()
-st.pyplot(plt)
+# Interactive PDF Chart
+st.subheader("How Likely Are Different Scores?")
+fig_pdf = go.Figure()
+for method, scores in scores_dict.items():
+    fig_pdf.add_trace(go.Histogram(
+        x=scores, histnorm='probability density',
+        name=method, opacity=0.7
+    ))
+fig_pdf.update_layout(title="Probability Density Function (PDF) - Score Distribution",
+                      xaxis_title="Score",
+                      yaxis_title="Density",
+                      barmode='overlay')
+st.plotly_chart(fig_pdf)
 
-# Plot CDFs
-st.subheader("Cumulative Distribution Functions (CDFs)")
-plt.figure(figsize=(10, 6))
-for r in results:
-    sns.ecdfplot(r["scores"], label=f"{r['method']}")
-plt.title("Cumulative Probability (CDF) of Scores")
-plt.xlabel("Score")
-plt.ylabel("Cumulative Probability")
-plt.legend()
-st.pyplot(plt)
+# Interactive CDF Chart
+st.subheader("Chances of Achieving a Certain Score")
+fig_cdf = go.Figure()
+for method, scores in scores_dict.items():
+    sorted_scores = np.sort(scores)
+    cumulative_probs = np.arange(1, len(sorted_scores) + 1) / len(sorted_scores)
+    fig_cdf.add_trace(go.Scatter(
+        x=sorted_scores, y=cumulative_probs, mode='lines',
+        name=method
+    ))
+fig_cdf.update_layout(title="Cumulative Distribution Function (CDF) - Score Probabilities",
+                      xaxis_title="Score",
+                      yaxis_title="Cumulative Probability")
+st.plotly_chart(fig_cdf)
 
 # Interpretation of Results
 st.header("Interpretation of Results")
