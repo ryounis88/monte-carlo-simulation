@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Streamlit App Title
-st.title("Monte Carlo Simulation for Project Delivery Method Selection")
+st.title("Project Delivery Method Selection")
 st.write("This app helps in selecting the best project delivery method by simulating different scenarios based on user-defined input values.")
 
 # Sidebar for User Inputs
@@ -13,52 +13,51 @@ st.sidebar.header("Simulation Parameters")
 iterations = st.sidebar.number_input("Number of Simulations", min_value=100, step=100, value=1000)
 
 st.sidebar.header("Weight Assignments (Total 100%)")
-time_weight = st.sidebar.number_input("Weight for Time (%)", min_value=0, value=40)
+time_weight = st.sidebar.number_input("Weight for Time (%)", min_value=0, value=30)
 cost_weight = st.sidebar.number_input("Weight for Cost (%)", min_value=0, value=30)
-quality_weight = st.sidebar.number_input("Weight for Quality (%)", min_value=0, value=30)
+scope_weight = st.sidebar.number_input("Weight for Scope (%)", min_value=0, value=20)
+quality_weight = st.sidebar.number_input("Weight for Quality (%)", min_value=0, value=20)
 
 # Normalize Weights
-total_weight = time_weight + cost_weight + quality_weight
+total_weight = time_weight + cost_weight + scope_weight + quality_weight
 if total_weight != 100:
     st.sidebar.warning("Weights should sum to 100%. Adjust the values.")
 
 weights = {
     "time": time_weight / 100,
     "cost": cost_weight / 100,
+    "scope": scope_weight / 100,
     "quality": quality_weight / 100,
 }
 
-# Main input section
-st.header("Project Delivery Method Parameters")
+# Project Delivery Methods Input
+st.header("Project Delivery Method Inputs (Editable Table)")
 
-def get_user_input(method_name, color):
-    """
-    Function to display user input fields for a project delivery method with unique color-coded headings.
-    """
-    st.markdown(f"<h2 style='color:{color};'>{method_name}</h2>", unsafe_allow_html=True)
-    
-    time_range = (st.number_input(f"{method_name} Time Min (months)", min_value=0.0, value=6.0),
-                  st.number_input(f"{method_name} Time Most Likely (months)", min_value=0.0, value=12.0),
-                  st.number_input(f"{method_name} Time Max (months)", min_value=0.0, value=24.0))
-    
-    cost_range = (st.number_input(f"{method_name} Cost Min ($M)", min_value=0.0, value=3.0),
-                  st.number_input(f"{method_name} Cost Most Likely ($M)", min_value=0.0, value=5.0),
-                  st.number_input(f"{method_name} Cost Max ($M)", min_value=0.0, value=7.0))
-    
-    quality_range = (st.number_input(f"{method_name} Quality Min (%)", min_value=0.0, value=75.0),
-                     st.number_input(f"{method_name} Quality Most Likely (%)", min_value=0.0, value=88.0),
-                     st.number_input(f"{method_name} Quality Max (%)", min_value=0.0, value=98.0))
+columns = ["Method", "Time Min (months)", "Time Most Likely (months)", "Time Max (months)", 
+           "Cost Min ($M)", "Cost Most Likely ($M)", "Cost Max ($M)", 
+           "Scope Min (%)", "Scope Most Likely (%)", "Scope Max (%)", 
+           "Quality Min (%)", "Quality Most Likely (%)", "Quality Max (%)"]
 
-    # Draw a horizontal separator
-    st.markdown("<hr>", unsafe_allow_html=True)
+data = [
+    ["Design-Bid-Build (DBB)", 6, 12, 24, 3.0, 5.0, 7.0, 70, 85, 95, 75, 88, 98],
+    ["Design-Build (DB)", 5, 10, 20, 3.5, 4.5, 6.5, 72, 86, 96, 78, 89, 99],
+    ["Construction Manager at Risk (CMAR)", 7, 14, 22, 3.2, 4.8, 6.8, 74, 87, 97, 76, 90, 99]
+]
 
-    return {"time": time_range, "cost": cost_range, "quality": quality_range}
+df_input = pd.DataFrame(data, columns=columns)
 
-methods = {
-    "Design-Bid-Build (DBB)": get_user_input("Design-Bid-Build (DBB)", "blue"),
-    "Design-Build (DB)": get_user_input("Design-Build (DB)", "green"),
-    "Construction Manager at Risk (CMAR)": get_user_input("Construction Manager at Risk (CMAR)", "red"),
-}
+# Editable Data Table
+df_input = st.data_editor(df_input)
+
+# Convert table input into dictionary
+methods = {}
+for index, row in df_input.iterrows():
+    methods[row["Method"]] = {
+        "time": (row["Time Min (months)"], row["Time Most Likely (months)"], row["Time Max (months)"]),
+        "cost": (row["Cost Min ($M)"], row["Cost Most Likely ($M)"], row["Cost Max ($M)"]),
+        "scope": (row["Scope Min (%)"], row["Scope Most Likely (%)"], row["Scope Max (%)"]),
+        "quality": (row["Quality Min (%)"], row["Quality Most Likely (%)"], row["Quality Max (%)"]),
+    }
 
 # Monte Carlo Simulation
 st.header("Running Monte Carlo Simulation...")
@@ -69,16 +68,19 @@ for method, params in methods.items():
     for _ in range(iterations):
         time = np.random.triangular(*params["time"])
         cost = np.random.triangular(*params["cost"])
+        scope = np.random.triangular(*params["scope"])
         quality = np.random.triangular(*params["quality"])
 
         # Normalize values
         norm_time = (time - params["time"][0]) / (params["time"][2] - params["time"][0])
         norm_cost = (cost - params["cost"][0]) / (params["cost"][2] - params["cost"][0])
+        norm_scope = (scope - params["scope"][0]) / (params["scope"][2] - params["scope"][0])
         norm_quality = (quality - params["quality"][0]) / (params["quality"][2] - params["quality"][0])
 
         # Compute Weighted Score
         score = (norm_time * weights["time"] +
                  norm_cost * weights["cost"] +
+                 norm_scope * weights["scope"] +
                  norm_quality * weights["quality"])
         scores.append(score)
 
@@ -104,5 +106,34 @@ plt.xlabel("Score")
 plt.ylabel("Density")
 plt.legend()
 st.pyplot(plt)
+
+# Plot CDFs
+st.subheader("Cumulative Distribution Functions (CDFs)")
+plt.figure(figsize=(10, 6))
+for r in results:
+    sns.ecdfplot(r["scores"], label=f"{r['method']}")
+plt.title("Cumulative Probability (CDF) of Scores")
+plt.xlabel("Score")
+plt.ylabel("Cumulative Probability")
+plt.legend()
+st.pyplot(plt)
+
+# Interpretation of Results
+st.header("Interpretation of Results")
+best_method = df_results.loc[df_results["Mean Score"].idxmax()]["Method"]
+st.write(f"Based on the Monte Carlo simulation, the **best project delivery method** is **{best_method}**, as it has the highest mean score.")
+
+st.write("### Key Observations:")
+for r in results:
+    st.write(f"**{r['method']}**:")
+    st.write(f"  - Mean Score: {r['mean_score']:.3f}")
+    st.write(f"  - Performance Variability: A narrow PDF indicates consistency, while a wider distribution means higher variability.")
+
+# Recommendations
+st.header("Recommendations")
+st.write("- If the project **prioritizes time**, select the method with the lowest variability in schedule performance.")
+st.write("- If **cost is the primary concern**, choose the method with the most stable cost distribution.")
+st.write("- If **scope adherence is critical**, opt for the method with the highest probability of meeting scope expectations.")
+st.write("- If **quality is a key factor**, select the method that consistently scores highest in quality.")
 
 st.write("For final decision-making, consider additional factors such as project complexity, risk tolerance, and stakeholder preferences.")
