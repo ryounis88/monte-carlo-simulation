@@ -1,68 +1,38 @@
-import streamlit as st
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
+import ace_tools as tools
 
-# Streamlit App Title
-st.title("Monte Carlo Simulation for Project Delivery Method Selection")
+# Define the number of Monte Carlo simulations
+iterations = 10000
 
-# Sidebar for User Inputs
-st.sidebar.header("Simulation Parameters")
-iterations = st.sidebar.number_input("Number of Simulations", min_value=100, step=100, value=1000)
-
-st.sidebar.header("Weight Assignments (Total 100%)")
-time_weight = st.sidebar.number_input("Weight for Time (%)", min_value=0, value=40)
-cost_weight = st.sidebar.number_input("Weight for Cost (%)", min_value=0, value=40)
-quality_weight = st.sidebar.number_input("Weight for Quality (%)", min_value=0, value=20)
-
-# Normalize Weights
-total_weight = time_weight + cost_weight + quality_weight
-if total_weight != 100:
-    st.sidebar.warning("Weights should sum to 100%. Adjust the values.")
-
+# Define weight assignments
 weights = {
-    "time": time_weight / 100,
-    "cost": cost_weight / 100,
-    "quality": quality_weight / 100,
+    "time": 0.4,  # 40%
+    "cost": 0.4,  # 40%
+    "quality": 0.2  # 20%
 }
 
-# Function to display user input fields with color-coded headings
-def get_user_input(method_name, color):
-    st.markdown(f"<h2 style='color:{color};'>{method_name}</h2>", unsafe_allow_html=True)
-
-    time_range = (
-        st.number_input(f"{method_name} Time Min (months)", min_value=0.0, value=6.0),
-        st.number_input(f"{method_name} Time Most Likely (months)", min_value=0.0, value=12.0),
-        st.number_input(f"{method_name} Time Max (months)", min_value=0.0, value=24.0),
-    )
-
-    cost_range = (
-        st.number_input(f"{method_name} Cost Min ($M)", min_value=0.0, value=3.0),
-        st.number_input(f"{method_name} Cost Most Likely ($M)", min_value=0.0, value=5.0),
-        st.number_input(f"{method_name} Cost Max ($M)", min_value=0.0, value=7.0),
-    )
-
-    quality_range = (
-        st.number_input(f"{method_name} Quality Min (%)", min_value=0.0, value=75.0),
-        st.number_input(f"{method_name} Quality Most Likely (%)", min_value=0.0, value=88.0),
-        st.number_input(f"{method_name} Quality Max (%)", min_value=0.0, value=98.0),
-    )
-
-    # Draw a horizontal separator
-    st.markdown("<hr>", unsafe_allow_html=True)
-
-    return {"time": time_range, "cost": cost_range, "quality": quality_range}
-
-# Define Project Delivery Methods with Color-Coded Sections
+# Define assumed input parameters for different project delivery methods
 methods = {
-    "Design-Bid-Build (DBB)": get_user_input("Design-Bid-Build (DBB)", "blue"),
-    "Design-Build (DB)": get_user_input("Design-Build (DB)", "green"),
-    "Construction Manager at Risk (CMAR)": get_user_input("Construction Manager at Risk (CMAR)", "red"),
+    "Design-Bid-Build (DBB)": {
+        "time": (6, 12, 24),
+        "cost": (3.0, 5.0, 7.0),
+        "quality": (75, 88, 98)
+    },
+    "Design-Build (DB)": {
+        "time": (5, 10, 18),
+        "cost": (2.5, 4.5, 6.5),
+        "quality": (80, 90, 99)
+    },
+    "Construction Manager at Risk (CMAR)": {
+        "time": (7, 14, 22),
+        "cost": (3.2, 4.8, 6.8),
+        "quality": (78, 89, 98)
+    }
 }
 
 # Monte Carlo Simulation
-st.header("Running Monte Carlo Simulation...")
 results = []
 scores_dict = {}
 
@@ -73,9 +43,9 @@ for method, params in methods.items():
         cost = np.random.triangular(*params["cost"])
         quality = np.random.triangular(*params["quality"])
 
-        # Proper Normalization per Method
-        norm_time = (time - params["time"][0]) / (params["time"][2] - params["time"][0]) if params["time"][2] > params["time"][0] else 0
-        norm_cost = (cost - params["cost"][0]) / (params["cost"][2] - params["cost"][0]) if params["cost"][2] > params["cost"][0] else 0
+        # Proper Normalization with Correct Scoring
+        norm_time = 1 - ((time - params["time"][0]) / (params["time"][2] - params["time"][0])) if params["time"][2] > params["time"][0] else 0
+        norm_cost = 1 - ((cost - params["cost"][0]) / (params["cost"][2] - params["cost"][0])) if params["cost"][2] > params["cost"][0] else 0
         norm_quality = (quality - params["quality"][0]) / (params["quality"][2] - params["quality"][0]) if params["quality"][2] > params["quality"][0] else 0
 
         # Compute Weighted Score
@@ -96,12 +66,33 @@ df_results = pd.DataFrame({
     "Standard Deviation": [r["std_dev"] for r in results]
 })
 
-# Display Results
-st.subheader("Simulation Results")
-st.write(df_results)
+# Generate Recommendations Based on Results
+recommendations = []
+for r in results:
+    method = r["method"]
+    mean_score = r["mean_score"]
+    std_dev = r["std_dev"]
+
+    recommendation = f"**{method}**:\n"
+    recommendation += f"- **Expected Performance**: Mean score of **{mean_score:.3f}**\n"
+    recommendation += f"- **Risk Level**: Standard deviation of **{std_dev:.3f}**\n"
+
+    if std_dev < 0.1:
+        recommendation += "- **Recommendation**: This method has **consistent** performance and is suitable for predictable projects.\n"
+    elif 0.1 <= std_dev < 0.2:
+        recommendation += "- **Recommendation**: This method has **moderate** variability and should be used with some risk planning.\n"
+    else:
+        recommendation += "- **Recommendation**: This method has **high** variability and should be chosen if flexibility is acceptable.\n"
+
+    recommendations.append(recommendation)
+
+# Display Recommendations
+recommendations_text = "\n\n".join(recommendations)
+
+# Display results in a table
+tools.display_dataframe_to_user(name="Monte Carlo Simulation Results", dataframe=df_results)
 
 # Interactive PDF Chart
-st.subheader("How Likely Are Different Scores?")
 fig_pdf = go.Figure()
 for method, scores in scores_dict.items():
     fig_pdf.add_trace(go.Histogram(
@@ -112,10 +103,11 @@ fig_pdf.update_layout(title="Probability Density Function (PDF) - Score Distribu
                       xaxis_title="Score",
                       yaxis_title="Density",
                       barmode='overlay')
-st.plotly_chart(fig_pdf)
+
+# Show PDF Chart
+fig_pdf.show()
 
 # Interactive CDF Chart
-st.subheader("Chances of Achieving a Certain Score")
 fig_cdf = go.Figure()
 for method, scores in scores_dict.items():
     sorted_scores = np.sort(scores)
@@ -127,4 +119,27 @@ for method, scores in scores_dict.items():
 fig_cdf.update_layout(title="Cumulative Distribution Function (CDF) - Score Probabilities",
                       xaxis_title="Score",
                       yaxis_title="Cumulative Probability")
-st.plotly_chart(fig_cdf)
+
+# Show CDF Chart
+fig_cdf.show()
+
+# Display Interpretations and Insights
+interpretation_text = f"""
+### **📌 Interpretation of Charts & Insights**
+
+#### **📊 Probability Density Function (PDF) - "How Likely Are Different Scores?"**
+- **What it Represents**: The PDF shows the **likelihood of different scores occurring** for each project delivery method.
+- **How to Read It**: A **higher peak** means that particular score happens more often.
+
+#### **📈 Cumulative Distribution Function (CDF) - "Chances of Achieving a Certain Score"**
+- **What it Represents**: The CDF shows the **probability of scoring at or below a certain value**.
+- **How to Read It**: A **steeper curve** means scores are tightly grouped (more predictable). A **gradual curve** means scores are more spread out (higher uncertainty).
+
+--- 
+
+### **📊 Key Recommendations Based on Monte Carlo Results**
+{recommendations_text}
+"""
+
+# Display interpretation
+print(interpretation_text)
