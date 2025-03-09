@@ -61,13 +61,22 @@ methods = {
 st.header("Running Monte Carlo Simulation...")
 results = []
 scores_dict = {}
+time_results = {}
+cost_results = {}
 
 for method, params in methods.items():
     scores = []
+    times = []
+    costs = []
+    
     for _ in range(iterations):
         time = np.random.triangular(*params["time"])
         cost = np.random.triangular(*params["cost"])
         quality = np.random.triangular(*params["quality"])
+
+        # Store time and cost for later comparison
+        times.append(time)
+        costs.append(cost)
 
         # Correct Normalization
         norm_time = 1 - ((time - params["time"][0]) / (params["time"][2] - params["time"][0])) if params["time"][2] > params["time"][0] else 0
@@ -82,65 +91,42 @@ for method, params in methods.items():
         )
         scores.append(score)
 
-    results.append({"method": method, "scores": scores, "mean_score": np.mean(scores), "std_dev": np.std(scores)})
+    results.append({
+        "method": method,
+        "scores": scores,
+        "mean_score": np.mean(scores),
+        "std_dev": np.std(scores),
+        "mean_time": np.mean(times),
+        "mean_cost": np.mean(costs)
+    })
+    
     scores_dict[method] = scores
+    time_results[method] = times
+    cost_results[method] = costs
 
 # Convert results into a DataFrame
-df_results = pd.DataFrame({
-    "Method": [r["method"] for r in results],
-    "Mean Score": [r["mean_score"] for r in results],
-    "Standard Deviation": [r["std_dev"] for r in results]
-})
+df_results = pd.DataFrame(results).drop(columns=["scores"])
 
 # Display results in Streamlit
 st.subheader("Simulation Results")
 st.dataframe(df_results)
 
-# Interactive PDF Chart
-st.subheader("How Likely Are Different Scores?")
-fig_pdf = go.Figure()
-for method, scores in scores_dict.items():
-    fig_pdf.add_trace(go.Histogram(
-        x=scores, histnorm='probability density',
-        name=method, opacity=0.7
-    ))
-fig_pdf.update_layout(title="Probability Density Function (PDF) - Score Distribution",
-                      xaxis_title="Score",
-                      yaxis_title="Density",
-                      barmode='overlay')
-st.plotly_chart(fig_pdf)
+# Practical Significance: Best vs Worst Time & Cost
+best_method = df_results.loc[df_results["mean_score"].idxmax()]
+worst_method = df_results.loc[df_results["mean_score"].idxmin()]
 
-# Interactive CDF Chart
-st.subheader("Chances of Achieving a Certain Score")
-fig_cdf = go.Figure()
-for method, scores in scores_dict.items():
-    sorted_scores = np.sort(scores)
-    cumulative_probs = np.arange(1, len(sorted_scores) + 1) / len(sorted_scores)
-    fig_cdf.add_trace(go.Scatter(
-        x=sorted_scores, y=cumulative_probs, mode='lines',
-        name=method
-    ))
-fig_cdf.update_layout(title="Cumulative Distribution Function (CDF) - Score Probabilities",
-                      xaxis_title="Score",
-                      yaxis_title="Cumulative Probability")
-st.plotly_chart(fig_cdf)
+time_saved = worst_method["mean_time"] - best_method["mean_time"]
+cost_saved = worst_method["mean_cost"] - best_method["mean_cost"]
+time_savings_percentage = (time_saved / worst_method["mean_time"]) * 100
+cost_savings_percentage = (cost_saved / worst_method["mean_cost"]) * 100
 
-# Interpretation of Results
-st.header("Interpretation of Results")
-best_method = df_results.loc[df_results["Mean Score"].idxmax()]["Method"]
-st.write(f"Based on the Monte Carlo simulation, the **best project delivery method** is **{best_method}**, as it has the highest mean score.")
-
-st.write("### Key Observations:")
-for r in results:
-    st.write(f"**{r['method']}**:")
-    st.write(f"  - Mean Score: {r['mean_score']:.3f}")
-    st.write(f"  - Standard Deviation: {r['std_dev']:.3f} (Indicates variability in performance)")
+st.subheader("Practical Significance")
+st.write(f"By choosing **{best_method['method']}**, an estimated **{time_saved:.2f} months** ({time_savings_percentage:.1f}%) can be saved in project duration.")
+st.write(f"Similarly, **{cost_saved:.2f} million dollars** ({cost_savings_percentage:.1f}%) can be saved in project cost.")
 
 # Recommendations
 st.header("Recommendations")
-for r in results:
-    st.write(f"### **{r['method']}**")
-    st.write(f"- **Expected Performance**: Mean score of **{r['mean_score']:.3f}**")
-    st.write(f"- **Risk Level**: Standard deviation of **{r['std_dev']:.3f}**")
+st.write(f"The best project delivery method is **{best_method['method']}**, as it has the highest expected performance.")
+if df_results["mean_score"].max() - df_results["mean_score"].min() < 0.05:
+    st.write("However, the differences are small, and other factors (such as legal constraints or project complexity) should also be considered.")
 
-st.write("For final decision-making, consider additional factors such as project complexity, risk tolerance, and stakeholder preferences.")
