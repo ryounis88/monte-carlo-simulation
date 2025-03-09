@@ -12,8 +12,8 @@ st.sidebar.header("Simulation Parameters")
 iterations = st.sidebar.number_input("Number of Simulations", min_value=100, step=100, value=10000)
 
 st.sidebar.header("Weight Assignments (Total 100%)")
-time_weight = st.sidebar.number_input("Weight for Time (%)", min_value=0, max_value=100, value=40)
-cost_weight = st.sidebar.number_input("Weight for Cost (%)", min_value=0, max_value=100, value=40)
+time_weight = st.sidebar.number_input("Weight for Time (%)", min_value=0, max_value=100, value=60)
+cost_weight = st.sidebar.number_input("Weight for Cost (%)", min_value=0, max_value=100, value=20)
 quality_weight = st.sidebar.number_input("Weight for Quality (%)", min_value=0, max_value=100, value=20)
 
 # Normalize Weights
@@ -80,11 +80,19 @@ for method, params in methods.items():
         times.append(time)
         costs.append(cost)
 
-        # Normalize scores
-        norm_time = 1 - ((time - params["time"][0]) / (params["time"][2] - params["time"][0]))
-        norm_cost = 1 - ((cost - params["cost"][0]) / (params["cost"][2] - params["cost"][0]))
-        norm_quality = (quality - params["quality"][0]) / (params["quality"][2] - params["quality"][0])
+        # Normalization function to avoid division by zero
+        def normalize(value, min_val, max_val, invert=False):
+            if max_val == min_val:
+                return 1  # If all values are the same, return 1 (neutral impact)
+            norm_value = (value - min_val) / (max_val - min_val)
+            return 1 - norm_value if invert else norm_value
 
+        # Normalize Scores
+        norm_time = normalize(time, min(times), max(times), invert=True)
+        norm_cost = normalize(cost, min(costs), max(costs), invert=True)
+        norm_quality = normalize(quality, min(quality), max(quality))
+
+        # Calculate weighted score
         score = (
             norm_time * weights["time"] +
             norm_cost * weights["cost"] +
