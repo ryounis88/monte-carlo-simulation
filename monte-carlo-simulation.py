@@ -97,48 +97,52 @@ for method, params in methods.items():
         "scores": scores,
         "mean_score": np.mean(scores),
         "std_dev": np.std(scores),
+        "mean_time": np.mean(times),
+        "mean_cost": np.mean(costs),
     })
     
     scores_dict[method] = scores
+    time_results[method] = times
+    cost_results[method] = costs
 
 # Convert results into a DataFrame
 df_results = pd.DataFrame(results).drop(columns=["scores"])
 st.subheader("Simulation Results")
 st.dataframe(df_results)
 
-# Statistical Significance (p-values)
-st.subheader("Statistical Significance (p-values from t-tests)")
-p_values = pd.DataFrame(index=methods.keys(), columns=methods.keys())
+# Interactive PDF Chart
+st.subheader("Probability Density Function (PDF) - Score Distribution")
+fig_pdf = go.Figure()
+for method, scores in scores_dict.items():
+    fig_pdf.add_trace(go.Histogram(x=scores, histnorm='probability density', name=method, opacity=0.7))
+fig_pdf.update_layout(title="PDF of Scores", xaxis_title="Score", yaxis_title="Density", barmode='overlay')
+st.plotly_chart(fig_pdf)
 
-for method1 in methods.keys():
-    for method2 in methods.keys():
-        if method1 != method2:
-            t_stat, p_value = ttest_ind(scores_dict[method1], scores_dict[method2])
-            p_values.loc[method1, method2] = round(p_value, 4)
-        else:
-            p_values.loc[method1, method2] = "-"
+# Interactive CDF Chart
+st.subheader("Cumulative Distribution Function (CDF) - Score Probabilities")
+fig_cdf = go.Figure()
+for method, scores in scores_dict.items():
+    sorted_scores = np.sort(scores)
+    cumulative_probs = np.arange(1, len(sorted_scores) + 1) / len(sorted_scores)
+    fig_cdf.add_trace(go.Scatter(x=sorted_scores, y=cumulative_probs, mode='lines', name=method))
+fig_cdf.update_layout(title="CDF of Scores", xaxis_title="Score", yaxis_title="Cumulative Probability")
+st.plotly_chart(fig_cdf)
 
-st.dataframe(p_values)
+# Calculate Practical Significance
+best_method = df_results.loc[df_results["mean_score"].idxmax()]
+non_best_methods = df_results[df_results["method"] != best_method["method"]]
 
-# Interpretation of Statistical Significance
-st.subheader("Interpretation of Statistical Significance")
-for method1 in methods.keys():
-    for method2 in methods.keys():
-        if method1 != method2:
-            p_value = p_values.loc[method1, method2]
-            if p_value != "-":
-                if float(p_value) < 0.05:
-                    st.write(f"✅ **{method1} is significantly different from {method2} (p={p_value})**.")
-                else:
-                    st.write(f"⚠️ **No significant difference between {method1} and {method2} (p={p_value})**.")
+st.subheader("Practical Significance")
+for _, method in non_best_methods.iterrows():
+    time_saved = method["mean_time"] - best_method["mean_time"]
+    cost_saved = method["mean_cost"] - best_method["mean_cost"]
+    time_savings_percentage = (time_saved / method["mean_time"]) * 100
+    cost_savings_percentage = (cost_saved / method["mean_cost"]) * 100
 
-st.markdown("""
-### **How to Understand p-values**
-- **p < 0.05:** We are at least **95% sure that the difference is real**, not just random.
-- **p ≥ 0.05:** The difference **might be due to chance**, so we cannot confidently say one method is better than the other.
-""")
+    st.write(f"By choosing **{best_method['method']}** over **{method['method']}**:")
+    st.write(f"- **Time saved:** {time_saved:.2f} months ({time_savings_percentage:.1f}%)")
+    st.write(f"- **Cost saved:** ${cost_saved:.2f} million ({cost_savings_percentage:.1f}%)")
 
 # Final Recommendation
-best_method = df_results.loc[df_results["mean_score"].idxmax()]
 st.header("Final Recommendation")
 st.write(f"✅ **{best_method['method']} is the recommended choice** based on statistical and practical significance.")
