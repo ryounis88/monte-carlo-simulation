@@ -11,9 +11,9 @@ st.sidebar.header("Simulation Parameters")
 iterations = st.sidebar.number_input("Number of Simulations", min_value=100, step=100, value=10000)
 
 st.sidebar.header("Weight Assignments (Total 100%)")
-time_weight = st.sidebar.number_input("Weight for Time (%)", min_value=0, value=40)
-cost_weight = st.sidebar.number_input("Weight for Cost (%)", min_value=0, value=40)
-quality_weight = st.sidebar.number_input("Weight for Quality (%)", min_value=0, value=20)
+time_weight = st.sidebar.number_input("Weight for Time (%)", min_value=0, max_value=100, value=40)
+cost_weight = st.sidebar.number_input("Weight for Cost (%)", min_value=0, max_value=100, value=40)
+quality_weight = st.sidebar.number_input("Weight for Quality (%)", min_value=0, max_value=100, value=20)
 
 # Normalize Weights
 total_weight = time_weight + cost_weight + quality_weight
@@ -30,17 +30,17 @@ weights = {
 def get_user_input(method_name, color):
     st.markdown(f"<h2 style='color:{color};'>{method_name}</h2>", unsafe_allow_html=True)
 
-    time_min = st.number_input(f"{method_name} Time Min (months)", min_value=0.0, value=6.0)
-    time_most_likely = st.number_input(f"{method_name} Time Most Likely (months)", min_value=0.0, value=12.0)
-    time_max = st.number_input(f"{method_name} Time Max (months)", min_value=0.0, value=24.0)
+    time_min = st.number_input(f"{method_name} Time Min (months)", min_value=0.0, value=10.0)
+    time_most_likely = st.number_input(f"{method_name} Time Most Likely (months)", min_value=0.0, value=15.0)
+    time_max = st.number_input(f"{method_name} Time Max (months)", min_value=0.0, value=25.0)
 
-    cost_min = st.number_input(f"{method_name} Cost Min ($M)", min_value=0.0, value=3.0)
-    cost_most_likely = st.number_input(f"{method_name} Cost Most Likely ($M)", min_value=0.0, value=5.0)
-    cost_max = st.number_input(f"{method_name} Cost Max ($M)", min_value=0.0, value=7.0)
+    cost_min = st.number_input(f"{method_name} Cost Min ($M)", min_value=0.0, value=4.0)
+    cost_most_likely = st.number_input(f"{method_name} Cost Most Likely ($M)", min_value=0.0, value=7.0)
+    cost_max = st.number_input(f"{method_name} Cost Max ($M)", min_value=0.0, value=10.0)
 
-    quality_min = st.number_input(f"{method_name} Quality Min (%)", min_value=0.0, value=75.0)
-    quality_most_likely = st.number_input(f"{method_name} Quality Most Likely (%)", min_value=0.0, value=88.0)
-    quality_max = st.number_input(f"{method_name} Quality Max (%)", min_value=0.0, value=98.0)
+    quality_min = st.number_input(f"{method_name} Quality Min (%)", min_value=0.0, value=70.0)
+    quality_most_likely = st.number_input(f"{method_name} Quality Most Likely (%)", min_value=0.0, value=85.0)
+    quality_max = st.number_input(f"{method_name} Quality Max (%)", min_value=0.0, value=95.0)
 
     st.markdown("<hr>", unsafe_allow_html=True)  # Horizontal separator
 
