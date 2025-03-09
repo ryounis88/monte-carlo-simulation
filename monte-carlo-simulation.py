@@ -26,23 +26,35 @@ weights = {
     "quality": quality_weight / 100,
 }
 
+# Function to display user input fields in table format
+def get_user_input(method_name, color):
+    st.markdown(f"<h2 style='color:{color};'>{method_name}</h2>", unsafe_allow_html=True)
+
+    time_min = st.number_input(f"{method_name} Time Min (months)", min_value=0.0, value=6.0)
+    time_most_likely = st.number_input(f"{method_name} Time Most Likely (months)", min_value=0.0, value=12.0)
+    time_max = st.number_input(f"{method_name} Time Max (months)", min_value=0.0, value=24.0)
+
+    cost_min = st.number_input(f"{method_name} Cost Min ($M)", min_value=0.0, value=3.0)
+    cost_most_likely = st.number_input(f"{method_name} Cost Most Likely ($M)", min_value=0.0, value=5.0)
+    cost_max = st.number_input(f"{method_name} Cost Max ($M)", min_value=0.0, value=7.0)
+
+    quality_min = st.number_input(f"{method_name} Quality Min (%)", min_value=0.0, value=75.0)
+    quality_most_likely = st.number_input(f"{method_name} Quality Most Likely (%)", min_value=0.0, value=88.0)
+    quality_max = st.number_input(f"{method_name} Quality Max (%)", min_value=0.0, value=98.0)
+
+    st.markdown("<hr>", unsafe_allow_html=True)  # Horizontal separator
+
+    return {
+        "time": (time_min, time_most_likely, time_max),
+        "cost": (cost_min, cost_most_likely, cost_max),
+        "quality": (quality_min, quality_most_likely, quality_max)
+    }
+
 # Define Project Delivery Methods
 methods = {
-    "Design-Bid-Build (DBB)": {
-        "time": (6, 12, 24),
-        "cost": (3.0, 5.0, 7.0),
-        "quality": (75, 88, 98)
-    },
-    "Design-Build (DB)": {
-        "time": (5, 10, 18),
-        "cost": (2.5, 4.5, 6.5),
-        "quality": (80, 90, 99)
-    },
-    "Construction Manager at Risk (CMAR)": {
-        "time": (7, 14, 22),
-        "cost": (3.2, 4.8, 6.8),
-        "quality": (78, 89, 98)
-    }
+    "Design-Bid-Build (DBB)": get_user_input("Design-Bid-Build (DBB)", "blue"),
+    "Design-Build (DB)": get_user_input("Design-Build (DB)", "green"),
+    "Construction Manager at Risk (CMAR)": get_user_input("Construction Manager at Risk (CMAR)", "red"),
 }
 
 # Monte Carlo Simulation
@@ -130,11 +142,5 @@ for r in results:
     st.write(f"### **{r['method']}**")
     st.write(f"- **Expected Performance**: Mean score of **{r['mean_score']:.3f}**")
     st.write(f"- **Risk Level**: Standard deviation of **{r['std_dev']:.3f}**")
-    if r["std_dev"] < 0.1:
-        st.write("- **Recommendation**: This method has **consistent** performance and is suitable for predictable projects.")
-    elif 0.1 <= r["std_dev"] < 0.2:
-        st.write("- **Recommendation**: This method has **moderate** variability and should be used with some risk planning.")
-    else:
-        st.write("- **Recommendation**: This method has **high** variability and should be chosen if flexibility is acceptable.")
 
 st.write("For final decision-making, consider additional factors such as project complexity, risk tolerance, and stakeholder preferences.")
