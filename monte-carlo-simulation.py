@@ -64,14 +64,21 @@ methods = {
 st.header("Running Monte Carlo Simulation...")
 results = []
 scores_dict = {}
+time_results = {}
+cost_results = {}
 
 for method, params in methods.items():
     scores = []
+    times = []
+    costs = []
 
     for _ in range(iterations):
         time = np.random.triangular(*params["time"])
         cost = np.random.triangular(*params["cost"])
         quality = np.random.triangular(*params["quality"])
+
+        times.append(time)
+        costs.append(cost)
 
         # Normalization function to penalize high time/cost and reward high quality
         def normalize(value, min_val, max_val, invert=False):
@@ -96,32 +103,18 @@ for method, params in methods.items():
         "scores": scores,
         "mean_score": np.mean(scores),
         "std_dev": np.std(scores),
+        "mean_time": np.mean(times),
+        "mean_cost": np.mean(costs),
     })
 
     scores_dict[method] = scores
+    time_results[method] = times
+    cost_results[method] = costs
 
 # Convert results into a DataFrame
 df_results = pd.DataFrame(results).drop(columns=["scores"])
 st.subheader("Simulation Results")
 st.dataframe(df_results)
-
-# Interactive PDF Chart
-st.subheader("Probability Density Function (PDF) - Score Distribution")
-fig_pdf = go.Figure()
-for method, scores in scores_dict.items():
-    fig_pdf.add_trace(go.Histogram(x=scores, histnorm='probability density', name=method, opacity=0.7))
-fig_pdf.update_layout(title="PDF of Scores", xaxis_title="Score", yaxis_title="Density", barmode='overlay')
-st.plotly_chart(fig_pdf)
-
-# Interactive CDF Chart
-st.subheader("Cumulative Distribution Function (CDF) - Score Probabilities")
-fig_cdf = go.Figure()
-for method, scores in scores_dict.items():
-    sorted_scores = np.sort(scores)
-    cumulative_probs = np.arange(1, len(sorted_scores) + 1) / len(sorted_scores)
-    fig_cdf.add_trace(go.Scatter(x=sorted_scores, y=cumulative_probs, mode='lines', name=method))
-fig_cdf.update_layout(title="CDF of Scores", xaxis_title="Score", yaxis_title="Cumulative Probability")
-st.plotly_chart(fig_cdf)
 
 # Statistical Significance (p-values)
 st.subheader("Statistical Significance (p-values from t-tests)")
@@ -137,7 +130,25 @@ for method1 in methods.keys():
 
 st.dataframe(p_values)
 
-# Final Recommendation
+# Practical Significance
+st.subheader("Practical Significance (Time & Cost Impact)")
 best_method = df_results.loc[df_results["mean_score"].idxmax()]
+for _, method in df_results.iterrows():
+    if method["method"] != best_method["method"]:
+        time_diff = method["mean_time"] - best_method["mean_time"]
+        cost_diff = method["mean_cost"] - best_method["mean_cost"]
+
+        st.write(f"Comparison: **{best_method['method']} vs. {method['method']}**")
+        if time_diff > 0:
+            st.write(f"✅ **{best_method['method']} saves** {time_diff:.2f} months.")
+        else:
+            st.write(f"⚠️ **{best_method['method']} requires** {-time_diff:.2f} more months.")
+
+        if cost_diff > 0:
+            st.write(f"✅ **{best_method['method']} saves** ${cost_diff:.2f} million.")
+        else:
+            st.write(f"⚠️ **{best_method['method']} costs** ${-cost_diff:.2f} million more.")
+
+# Final Recommendation
 st.header("Final Recommendation")
 st.write(f"✅ **{best_method['method']} is the recommended choice** based on statistical and practical significance.")
