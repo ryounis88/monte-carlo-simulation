@@ -73,10 +73,10 @@ for method, params in methods.items():
         cost = np.random.triangular(*params["cost"])
         quality = np.random.triangular(*params["quality"])
 
-        # Normalize values
-        norm_time = (time - params["time"][0]) / (params["time"][2] - params["time"][0])
-        norm_cost = (cost - params["cost"][0]) / (params["cost"][2] - params["cost"][0])
-        norm_quality = (quality - params["quality"][0]) / (params["quality"][2] - params["quality"][0])
+        # Proper Normalization per Method
+        norm_time = (time - params["time"][0]) / (params["time"][2] - params["time"][0]) if params["time"][2] > params["time"][0] else 0
+        norm_cost = (cost - params["cost"][0]) / (params["cost"][2] - params["cost"][0]) if params["cost"][2] > params["cost"][0] else 0
+        norm_quality = (quality - params["quality"][0]) / (params["quality"][2] - params["quality"][0]) if params["quality"][2] > params["quality"][0] else 0
 
         # Compute Weighted Score
         score = (
@@ -128,29 +128,3 @@ fig_cdf.update_layout(title="Cumulative Distribution Function (CDF) - Score Prob
                       xaxis_title="Score",
                       yaxis_title="Cumulative Probability")
 st.plotly_chart(fig_cdf)
-
-# Interpretation of Results
-st.header("Interpretation of Results")
-best_method = df_results.loc[df_results["Mean Score"].idxmax()]["Method"]
-st.write(f"Based on the Monte Carlo simulation, the **best project delivery method** is **{best_method}**, as it has the highest mean score.")
-
-st.write("### Key Observations:")
-for r in results:
-    st.write(f"**{r['method']}**:")
-    st.write(f"  - Mean Score: {r['mean_score']:.3f}")
-    st.write(f"  - Standard Deviation: {r['std_dev']:.3f} (Indicates variability in performance)")
-
-# Recommendations
-st.header("Recommendations")
-for r in results:
-    st.write(f"### **{r['method']}**")
-    st.write(f"- **Expected Performance**: Mean score of **{r['mean_score']:.3f}**")
-    st.write(f"- **Risk Level**: Standard deviation of **{r['std_dev']:.3f}**")
-    if r["std_dev"] < 0.1:
-        st.write("- **Recommendation**: This method has **consistent** performance and is suitable for predictable projects.")
-    elif 0.1 <= r["std_dev"] < 0.2:
-        st.write("- **Recommendation**: This method has **moderate** variability and should be used with some risk planning.")
-    else:
-        st.write("- **Recommendation**: This method has **high** variability and should be chosen if flexibility is acceptable.")
-
-st.write("For final decision-making, consider additional factors such as project complexity, risk tolerance, and stakeholder preferences.")
