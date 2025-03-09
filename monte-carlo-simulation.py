@@ -58,15 +58,23 @@ methods = {
 st.header("Running Monte Carlo Simulation...")
 results = []
 scores_dict = {}
+time_results = {}
+cost_results = {}
 
 for method, params in methods.items():
     scores = []
+    times = []
+    costs = []
     
     for _ in range(iterations):
         time = np.random.triangular(*params["time"])
         cost = np.random.triangular(*params["cost"])
         quality = np.random.triangular(*params["quality"])
 
+        times.append(time)
+        costs.append(cost)
+
+        # Normalize scores
         norm_time = 1 - ((time - params["time"][0]) / (params["time"][2] - params["time"][0]))
         norm_cost = 1 - ((cost - params["cost"][0]) / (params["cost"][2] - params["cost"][0]))
         norm_quality = (quality - params["quality"][0]) / (params["quality"][2] - params["quality"][0])
@@ -83,9 +91,13 @@ for method, params in methods.items():
         "scores": scores,
         "mean_score": np.mean(scores),
         "std_dev": np.std(scores),
+        "mean_time": np.mean(times),
+        "mean_cost": np.mean(costs),
     })
     
     scores_dict[method] = scores
+    time_results[method] = times
+    cost_results[method] = costs
 
 # Convert results into a DataFrame
 df_results = pd.DataFrame(results).drop(columns=["scores"])
@@ -106,39 +118,32 @@ for method1 in methods.keys():
 
 st.dataframe(p_values)
 
-# Interactive PDF Chart
-st.subheader("How Likely Are Different Scores? (PDF)")
-fig_pdf = go.Figure()
-for method, scores in scores_dict.items():
-    fig_pdf.add_trace(go.Histogram(
-        x=scores, histnorm='probability density',
-        name=method, opacity=0.7
-    ))
-fig_pdf.update_layout(title="Probability Density Function (PDF) - Score Distribution",
-                      xaxis_title="Score",
-                      yaxis_title="Density",
-                      barmode='overlay')
-st.plotly_chart(fig_pdf)
+# Interpret Statistical Significance
+st.subheader("Interpretation of Statistical Significance")
+for method1 in methods.keys():
+    for method2 in methods.keys():
+        if method1 != method2:
+            p_value = p_values.loc[method1, method2]
+            if p_value != "-":
+                if float(p_value) < 0.05:
+                    st.write(f"✅ **{method1} is significantly different from {method2} (p={p_value})**.")
+                else:
+                    st.write(f"⚠️ **No significant difference between {method1} and {method2} (p={p_value})**.")
 
-# Interactive CDF Chart
-st.subheader("Chances of Achieving a Certain Score (CDF)")
-fig_cdf = go.Figure()
-for method, scores in scores_dict.items():
-    sorted_scores = np.sort(scores)
-    cumulative_probs = np.arange(1, len(sorted_scores) + 1) / len(sorted_scores)
-    fig_cdf.add_trace(go.Scatter(
-        x=sorted_scores, y=cumulative_probs, mode='lines',
-        name=method
-    ))
-fig_cdf.update_layout(title="Cumulative Distribution Function (CDF) - Score Probabilities",
-                      xaxis_title="Score",
-                      yaxis_title="Cumulative Probability")
-st.plotly_chart(fig_cdf)
+# Calculate Practical Significance
+best_method = df_results.loc[df_results["mean_score"].idxmax()]
+worst_method = df_results.loc[df_results["mean_score"].idxmin()]
+
+time_saved = worst_method["mean_time"] - best_method["mean_time"]
+cost_saved = worst_method["mean_cost"] - best_method["mean_cost"]
+time_savings_percentage = (time_saved / worst_method["mean_time"]) * 100
+cost_savings_percentage = (cost_saved / worst_method["mean_cost"]) * 100
+
+st.subheader("Practical Significance")
+st.write(f"By choosing **{best_method['method']}**, an estimated **{time_saved:.2f} months** ({time_savings_percentage:.1f}%) can be saved in project duration.")
+st.write(f"Similarly, **{cost_saved:.2f} million dollars** ({cost_savings_percentage:.1f}%) can be saved in project cost.")
 
 # Final Recommendation
 st.header("Final Recommendation")
-best_method = df_results.loc[df_results["mean_score"].idxmax()]
-if df_results["mean_score"].max() - df_results["mean_score"].min() < 0.05:
-    st.write("Differences between methods are small. Consider other factors like risk and complexity.")
-else:
-    st.write(f"**{best_method['method']}** is statistically and practically the best choice.")
+st.write(f"✅ **{best_method['method']} is the recommended choice** based on the simulation.")
+
