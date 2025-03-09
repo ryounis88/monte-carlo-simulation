@@ -134,14 +134,19 @@ non_best_methods = df_results[df_results["method"] != best_method["method"]]
 
 st.subheader("Practical Significance")
 for _, method in non_best_methods.iterrows():
-    time_saved = method["mean_time"] - best_method["mean_time"]
-    cost_saved = method["mean_cost"] - best_method["mean_cost"]
-    time_savings_percentage = (time_saved / method["mean_time"]) * 100
-    cost_savings_percentage = (cost_saved / method["mean_cost"]) * 100
+    time_difference = method["mean_time"] - best_method["mean_time"]
+    cost_difference = method["mean_cost"] - best_method["mean_cost"]
 
-    st.write(f"By choosing **{best_method['method']}** over **{method['method']}**:")
-    st.write(f"- **Time saved:** {time_saved:.2f} months ({time_savings_percentage:.1f}%)")
-    st.write(f"- **Cost saved:** ${cost_saved:.2f} million ({cost_savings_percentage:.1f}%)")
+    st.write(f"Comparison between **{best_method['method']}** and **{method['method']}:**")
+    if time_difference > 0:
+        st.write(f"✅ **{best_method['method']} saves** {time_difference:.2f} months compared to {method['method']}.")
+    else:
+        st.write(f"⚠️ **{best_method['method']} requires** {-time_difference:.2f} more months than {method['method']}.")
+
+    if cost_difference > 0:
+        st.write(f"✅ **{best_method['method']} saves** ${cost_difference:.2f} million compared to {method['method']}.")
+    else:
+        st.write(f"⚠️ **{best_method['method']} costs** ${-cost_difference:.2f} million more than {method['method']}.")
 
 # Final Recommendation
 st.header("Final Recommendation")
