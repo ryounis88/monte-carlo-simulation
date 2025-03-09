@@ -64,35 +64,26 @@ methods = {
 st.header("Running Monte Carlo Simulation...")
 results = []
 scores_dict = {}
-time_results = {}
-cost_results = {}
 
 for method, params in methods.items():
     scores = []
-    times = []
-    costs = []
-    
+
     for _ in range(iterations):
         time = np.random.triangular(*params["time"])
         cost = np.random.triangular(*params["cost"])
         quality = np.random.triangular(*params["quality"])
 
-        times.append(time)
-        costs.append(cost)
-
-        # Normalization function to avoid division by zero
+        # Normalization function to penalize high time/cost and reward high quality
         def normalize(value, min_val, max_val, invert=False):
             if max_val == min_val:
-                return 1  # If all values are the same, return 1 (neutral impact)
+                return 0 if invert else 1  
             norm_value = (value - min_val) / (max_val - min_val)
             return 1 - norm_value if invert else norm_value
 
-        # Normalize Scores
-        norm_time = normalize(time, min(times), max(times), invert=True)
-        norm_cost = normalize(cost, min(costs), max(costs), invert=True)
-        norm_quality = normalize(quality, min(quality), max(quality))
+        norm_time = normalize(time, params["time"][0], params["time"][2], invert=True)
+        norm_cost = normalize(cost, params["cost"][0], params["cost"][2], invert=True)
+        norm_quality = normalize(quality, params["quality"][0], params["quality"][2])
 
-        # Calculate weighted score
         score = (
             norm_time * weights["time"] +
             norm_cost * weights["cost"] +
@@ -105,13 +96,9 @@ for method, params in methods.items():
         "scores": scores,
         "mean_score": np.mean(scores),
         "std_dev": np.std(scores),
-        "mean_time": np.mean(times),
-        "mean_cost": np.mean(costs),
     })
-    
+
     scores_dict[method] = scores
-    time_results[method] = times
-    cost_results[method] = costs
 
 # Convert results into a DataFrame
 df_results = pd.DataFrame(results).drop(columns=["scores"])
@@ -136,26 +123,21 @@ for method, scores in scores_dict.items():
 fig_cdf.update_layout(title="CDF of Scores", xaxis_title="Score", yaxis_title="Cumulative Probability")
 st.plotly_chart(fig_cdf)
 
-# Calculate Practical Significance
-best_method = df_results.loc[df_results["mean_score"].idxmax()]
-non_best_methods = df_results[df_results["method"] != best_method["method"]]
+# Statistical Significance (p-values)
+st.subheader("Statistical Significance (p-values from t-tests)")
+p_values = pd.DataFrame(index=methods.keys(), columns=methods.keys())
 
-st.subheader("Practical Significance")
-for _, method in non_best_methods.iterrows():
-    time_difference = method["mean_time"] - best_method["mean_time"]
-    cost_difference = method["mean_cost"] - best_method["mean_cost"]
+for method1 in methods.keys():
+    for method2 in methods.keys():
+        if method1 != method2:
+            t_stat, p_value = ttest_ind(scores_dict[method1], scores_dict[method2])
+            p_values.loc[method1, method2] = round(p_value, 4)
+        else:
+            p_values.loc[method1, method2] = "-"
 
-    st.write(f"Comparison between **{best_method['method']}** and **{method['method']}:**")
-    if time_difference > 0:
-        st.write(f"✅ **{best_method['method']} saves** {time_difference:.2f} months compared to {method['method']}.")
-    else:
-        st.write(f"⚠️ **{best_method['method']} requires** {-time_difference:.2f} more months than {method['method']}.")
-
-    if cost_difference > 0:
-        st.write(f"✅ **{best_method['method']} saves** ${cost_difference:.2f} million compared to {method['method']}.")
-    else:
-        st.write(f"⚠️ **{best_method['method']} costs** ${-cost_difference:.2f} million more than {method['method']}.")
+st.dataframe(p_values)
 
 # Final Recommendation
+best_method = df_results.loc[df_results["mean_score"].idxmax()]
 st.header("Final Recommendation")
 st.write(f"✅ **{best_method['method']} is the recommended choice** based on statistical and practical significance.")
